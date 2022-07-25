@@ -1,15 +1,4 @@
 (function () {
-  const Jan1st = new Date();
-  Jan1st.setDate(1);
-  Jan1st.setMonth(0);
-  Jan1st.setFullYear(Jan1st.getFullYear() + 1);
-
-  function ageAt(birthDate) {
-    return Math.abs(
-      new Date(Jan1st.getTime() - birthDate.getTime()).getUTCFullYear() - 1970
-    );
-  }
-
   function ageGroupFor(janAge) {
     if (janAge < 6) {
       return 6;
@@ -19,14 +8,42 @@
   function formatDate(d) {
     return d.toISOString().split("T")[0];
   }
-  function ago(years) {
-    const t = new Date(Jan1st.getTime());
-    t.setFullYear(t.getFullYear() - years);
-    return t;
-  }
+
   class AgeGroup extends HTMLElement {
     static get observedAttributes() {
-      return ["min", "max"];
+      return ["min", "max", "month", "date"];
+    }
+    get relTo() {
+      const jan1st = new Date();
+      jan1st.setDate(this.date);
+      jan1st.setMonth(this.month);
+      jan1st.setFullYear(jan1st.getFullYear() + 1);
+      return jan1st;
+    }
+    ago(years) {
+      const t = new Date(this.relTo.getTime());
+      t.setFullYear(t.getFullYear() - years);
+      return t;
+    }
+    ageAt(birthDate) {
+      return Math.abs(
+        new Date(this.relTo.getTime() - birthDate.getTime()).getUTCFullYear() -
+          1970
+      );
+    }
+    get month() {
+      return this.hasAttribute("month")
+        ? Number(this.getAttribute("month"))
+        : 0;
+    }
+    set month(val) {
+      this.setAttribute("month", month);
+    }
+    get date() {
+      return this.hasAttribute("date") ? Number(this.getAttribute("date")) : 1;
+    }
+    set date(val) {
+      this.setAttribute("date", val);
     }
 
     // connect component
@@ -66,8 +83,8 @@
        }
     </style>
 
-    <input type="date" min="${formatDate(ago(this.maxAge))}" max="${formatDate(
-        ago(this.minAge)
+    <input type="date" min="${formatDate(this.ago(this.maxAge))}" max="${formatDate(
+        this.ago(this.minAge)
       )}"/>
     <p></p>
     `;
@@ -75,12 +92,12 @@
         if (!e.target.value) {
           return;
         }
-        const janAge = ageAt(new Date(e.target.value));
+        const janAge = this.ageAt(new Date(e.target.value));
         const p = shadow.querySelector("p");
         if (janAge < 4) {
-          p.innerHTML = "Sorry must be 4 by Jan 1, " + Jan1st.getFullYear();
+          p.innerHTML = "Sorry must be 4 by " + formatDate(this.relTo);
         } else if (janAge > 14) {
-          p.innerHTML = "Sorry must under 14 by Jan 1, " + Jan1st.getFullYear();
+          p.innerHTML = "Sorry must under  " + formatDate(this.relTo);
         } else {
           p.innerHTML = ageGroupFor(janAge) + "U";
         }
