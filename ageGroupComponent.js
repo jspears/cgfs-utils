@@ -8,6 +8,24 @@
   function formatDate(d) {
     return d.toISOString().split("T")[0];
   }
+  class DateFormat extends HTMLElement {
+    static get observedAttributes() {
+      return ["date", "dateStyle"];
+    }
+    connectedCallback() {
+      this.render();
+    }
+    attributeChangedCallback(name, oldValue, newValue) {
+      this.render();
+    }
+    render() {
+      const date = new Date(this.getAttribute("date") || Date.now());
+
+      this.innerHTML = new Intl.DateTimeFormat("default", {
+        dateStyle: this.getAttribute("dateStyle") || "short",
+      }).format(date);
+    }
+  }
 
   class AgeGroup extends HTMLElement {
     static get observedAttributes() {
@@ -71,11 +89,29 @@
 
     attributeChangedCallback(name, oldValue, newValue) {
       this[name] = newValue;
+      this.render();
     }
-
     connectedCallback() {
-      const shadow = this.attachShadow({ mode: "closed" });
-      shadow.innerHTML = `
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.addEventListener("input", (e) => {
+        if (!e.target.value) {
+          return;
+        }
+        const janAge = this.ageAt(new Date(e.target.value));
+        const p = this.shadowRoot.querySelector("p");
+        if (janAge < this.minAge) {
+          p.innerHTML = `Sorry must be over ${this.minAge} by <fmt-date date="${this.relTo}"/>`;
+        } else if (janAge > this.maxAge) {
+          p.innerHTML = `Sorry must under ${this.maxAge} on <fmt-date date="${this.relTo}"/>`;
+        } else {
+          p.innerHTML = `${ageGroupFor(janAge)}U`;
+        }
+      });
+
+      this.render();
+    }
+    render() {
+      this.shadowRoot.innerHTML = `
     <style>
       p {
         font-weight: normal;
@@ -83,27 +119,14 @@
        }
     </style>
 
-    <input type="date" min="${formatDate(this.ago(this.maxAge))}" max="${formatDate(
-        this.ago(this.minAge)
-      )}"/>
+    <input type="date" min="${formatDate(
+      this.ago(this.maxAge)
+    )}" max="${formatDate(this.ago(this.minAge))}"/>
     <p></p>
     `;
-      shadow.querySelector("input").addEventListener("input", (e) => {
-        if (!e.target.value) {
-          return;
-        }
-        const janAge = this.ageAt(new Date(e.target.value));
-        const p = shadow.querySelector("p");
-        if (janAge < 4) {
-          p.innerHTML = "Sorry must be 4 by " + formatDate(this.relTo);
-        } else if (janAge > 14) {
-          p.innerHTML = "Sorry must under  " + formatDate(this.relTo);
-        } else {
-          p.innerHTML = ageGroupFor(janAge) + "U";
-        }
-      });
     }
   }
   window.customElements.define("age-group", AgeGroup);
+  window.customElements.define("fmt-date", DateFormat);
   console.log("loaded");
 })();
