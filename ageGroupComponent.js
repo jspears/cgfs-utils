@@ -9,9 +9,8 @@
     return d.toISOString().split("T")[0];
   }
   class DateFormat extends HTMLElement {
-    static get observedAttributes() {
-      return ["date", "dateStyle"];
-    }
+    static observedAttributes = ["date", "dateStyle"];
+
     connectedCallback() {
       this.render();
     }
@@ -55,7 +54,7 @@
         : 0;
     }
     set month(val) {
-      this.setAttribute("month", month);
+      this.setAttribute("month", val);
     }
     get date() {
       return this.hasAttribute("date") ? Number(this.getAttribute("date")) : 1;
@@ -65,21 +64,21 @@
     }
 
     // connect component
-    get minAge() {
+    get min() {
       return this.hasAttribute("min") ? Number(this.getAttribute("min")) : 4;
     }
-    set minAge(val) {
+    set min(val) {
       if (val) {
         this.setAttribute("min", val);
       } else {
         this.removeAttribute("min");
       }
     }
-    get maxAge() {
+    get max() {
       return this.hasAttribute("max") ? Number(this.getAttribute("max")) : 15;
     }
 
-    set maxAge(val) {
+    set max(val) {
       if (val) {
         this.setAttribute("max", val);
       } else {
@@ -99,10 +98,10 @@
         }
         const janAge = this.ageAt(new Date(e.target.value));
         const p = this.shadowRoot.querySelector("p");
-        if (janAge < this.minAge) {
-          p.innerHTML = `Sorry must be over ${this.minAge} by <fmt-date date="${this.relTo}"/>`;
-        } else if (janAge > this.maxAge) {
-          p.innerHTML = `Sorry must under ${this.maxAge} on <fmt-date date="${this.relTo}"/>`;
+        if (janAge < this.min) {
+          p.innerHTML = `Sorry must be over ${this.min} by <fmt-date date="${this.relTo}"/>`;
+        } else if (janAge > this.max) {
+          p.innerHTML = `Sorry must under ${this.max} on <fmt-date date="${this.relTo}"/>`;
         } else {
           p.innerHTML = `${ageGroupFor(janAge)}U`;
         }
@@ -120,8 +119,8 @@
     </style>
 
     <input type="date" min="${formatDate(
-      this.ago(this.maxAge)
-    )}" max="${formatDate(this.ago(this.minAge))}"/>
+      this.ago(this.max)
+    )}" max="${formatDate(this.ago(this.min))}"/>
     <p></p>
     `;
     }
