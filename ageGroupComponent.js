@@ -68,7 +68,6 @@
       rel.setMonth(this.month);
       rel.setHours(23, 59, 59, 999);
       rel.setFullYear(rel.getFullYear() + this.year);
-      console.log("relTo", rel);
       return rel;
     }
     ago(years, relTo) {
@@ -84,16 +83,23 @@
       );
     }
 
-    attributeChangedCallback(name, oldValue, newValue) {
+    attributeChangedCallback() {
       this.render();
     }
     connectedCallback() {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("input", (e) => {
-        this.birthdate = e.target.value;
+        const birthdate = this.birthdate;
+        if (formatDate(birthdate) !== e.target.value) {
+          this.birthdate = e.target.value;
+        }
       });
+      this.shadowRoot.addEventListener("focus", () => this.focus());
 
       this.render();
+    }
+    focus() {
+      this.input?.focus();
     }
     get input() {
       return this.shadowRoot.querySelector("input");
@@ -101,25 +107,26 @@
     set message(value) {
       return (this.shadowRoot.querySelector("p").innerHTML = value);
     }
-    get message() {
-      return this.shadowRoot.querySelector("p").innerHTML;
-    }
+
     update() {
-      const relTo = this.relTo;
-      this.input.min = formatDate(this.ago(this.max, relTo));
-      this.input.max = formatDate(this.ago(this.min, relTo));
-      this.input.value = formatDate(this.birthdate);
-      const janAge = this.birthdate ? this.ageAt(this.birthdate, relTo) : null;
-      if (janAge) {
-        if (janAge < this.min) {
+      const { input, relTo, birthdate } = this;
+      input.min = formatDate(this.ago(this.max, relTo));
+      input.max = formatDate(this.ago(this.min, relTo));
+      input.value = formatDate(birthdate);
+      this.message = "";
+      const age = birthdate ? this.ageAt(birthdate, relTo) : null;
+
+      if (age) {
+        if (age < this.min) {
           this.message = `Sorry must be over ${this.min} by <fmt-date date="${relTo}"/>`;
-        } else if (janAge > this.max) {
+          this.focus();
+
+        } else if (age > this.max) {
           this.message = `Sorry must under ${this.max} on <fmt-date date="${relTo}"/>`;
+          this.focus();
         } else {
-          this.message = `${ageGroupFor(janAge, relTo)}U`;
+          this.message = `${ageGroupFor(age, relTo)}U`;
         }
-      } else {
-        this.message = "";
       }
     }
     render() {
