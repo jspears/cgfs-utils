@@ -6,7 +6,7 @@
     return janAge + (janAge % 2);
   }
   function formatDate(d) {
-    return d.toISOString().split("T")[0];
+    return d?.toISOString().split("T")[0] ?? "";
   }
   class DateFormat extends HTMLElement {
     static observedAttributes = ["date", "dateStyle"];
@@ -21,93 +21,106 @@
       const date = new Date(this.getAttribute("date") || Date.now());
 
       this.innerHTML = new Intl.DateTimeFormat("default", {
-        dateStyle: this.getAttribute("dateStyle") || "short",
+        dateStyle: this.getAttribute("dateStyle") || "medium",
       }).format(date);
     }
   }
 
   class AgeGroup extends HTMLElement {
+    static defaultValues = {
+      min: 4,
+      max: 14,
+      month: 11,
+      date: 31,
+      year: 0,
+      birthdate: (v) => (v != null ? new Date(v) : v),
+    };
     static get observedAttributes() {
-      return ["min", "max", "month", "date"];
+      return Object.keys(this.defaultValues);
+    }
+    constructor() {
+      super();
+      for (const [key, def] of Object.entries(this.constructor.defaultValues)) {
+        Object.defineProperty(this, key, {
+          set(val) {
+            if (val == null) {
+              this.removeAttribute(val);
+            }
+            this.setAttribute(key, val);
+          },
+          get() {
+            let convert = Number;
+            let defValue = def;
+            if (typeof defValue === "function") {
+              convert = def;
+              defValue = null;
+            }
+            return this.hasAttribute(key)
+              ? convert(this.getAttribute(key))
+              : defValue;
+          },
+        });
+      }
     }
     get relTo() {
-      const jan1st = new Date();
-      jan1st.setDate(this.date);
-      jan1st.setMonth(this.month);
-      jan1st.setFullYear(jan1st.getFullYear() + 1);
-      return jan1st;
+      const rel = new Date();
+      rel.setDate(this.date);
+      rel.setMonth(this.month);
+      rel.setHours(23, 59, 59, 999);
+      rel.setFullYear(rel.getFullYear() + this.year);
+      console.log("relTo", rel);
+      return rel;
     }
-    ago(years) {
-      const t = new Date(this.relTo.getTime());
+    ago(years, relTo) {
+      const t = new Date((relTo || this.relTo).getTime());
       t.setFullYear(t.getFullYear() - years);
       return t;
     }
-    ageAt(birthDate) {
+    ageAt(birthDate, relTo) {
       return Math.abs(
-        new Date(this.relTo.getTime() - birthDate.getTime()).getUTCFullYear() -
-          1970
+        new Date(
+          (relTo || this.relTo).getTime() - birthDate.getTime()
+        ).getUTCFullYear() - 1970
       );
-    }
-    get month() {
-      return this.hasAttribute("month")
-        ? Number(this.getAttribute("month"))
-        : 0;
-    }
-    set month(val) {
-      this.setAttribute("month", val);
-    }
-    get date() {
-      return this.hasAttribute("date") ? Number(this.getAttribute("date")) : 1;
-    }
-    set date(val) {
-      this.setAttribute("date", val);
-    }
-
-    // connect component
-    get min() {
-      return this.hasAttribute("min") ? Number(this.getAttribute("min")) : 4;
-    }
-    set min(val) {
-      if (val) {
-        this.setAttribute("min", val);
-      } else {
-        this.removeAttribute("min");
-      }
-    }
-    get max() {
-      return this.hasAttribute("max") ? Number(this.getAttribute("max")) : 15;
-    }
-
-    set max(val) {
-      if (val) {
-        this.setAttribute("max", val);
-      } else {
-        this.removeAttribute("max");
-      }
     }
 
     attributeChangedCallback(name, oldValue, newValue) {
-      this[name] = newValue;
       this.render();
     }
     connectedCallback() {
       this.attachShadow({ mode: "open" });
       this.shadowRoot.addEventListener("input", (e) => {
-        if (!e.target.value) {
-          return;
-        }
-        const janAge = this.ageAt(new Date(e.target.value));
-        const p = this.shadowRoot.querySelector("p");
-        if (janAge < this.min) {
-          p.innerHTML = `Sorry must be over ${this.min} by <fmt-date date="${this.relTo}"/>`;
-        } else if (janAge > this.max) {
-          p.innerHTML = `Sorry must under ${this.max} on <fmt-date date="${this.relTo}"/>`;
-        } else {
-          p.innerHTML = `${ageGroupFor(janAge)}U`;
-        }
+        this.birthdate = e.target.value;
       });
 
       this.render();
+    }
+    get input() {
+      return this.shadowRoot.querySelector("input");
+    }
+    set message(value) {
+      return (this.shadowRoot.querySelector("p").innerHTML = value);
+    }
+    get message() {
+      return this.shadowRoot.querySelector("p").innerHTML;
+    }
+    update() {
+      const relTo = this.relTo;
+      this.input.min = formatDate(this.ago(this.max, relTo));
+      this.input.max = formatDate(this.ago(this.min, relTo));
+      this.input.value = formatDate(this.birthdate);
+      const janAge = this.birthdate ? this.ageAt(this.birthdate, relTo) : null;
+      if (janAge) {
+        if (janAge < this.min) {
+          this.message = `Sorry must be over ${this.min} by <fmt-date date="${relTo}"/>`;
+        } else if (janAge > this.max) {
+          this.message = `Sorry must under ${this.max} on <fmt-date date="${relTo}"/>`;
+        } else {
+          this.message = `${ageGroupFor(janAge, relTo)}U`;
+        }
+      } else {
+        this.message = "";
+      }
     }
     render() {
       this.shadowRoot.innerHTML = `
@@ -118,14 +131,13 @@
        }
     </style>
 
-    <input type="date" min="${formatDate(
-      this.ago(this.max)
-    )}" max="${formatDate(this.ago(this.min))}"/>
+    <input type="date"/>
+
     <p></p>
     `;
+      this.update();
     }
   }
   window.customElements.define("age-group", AgeGroup);
   window.customElements.define("fmt-date", DateFormat);
-  console.log("loaded");
 })();
